@@ -42,7 +42,7 @@ setup(
     ],
     keywords='physics',
     packages=find_packages(),
-    install_requires=[],
+    install_requires=["numpy", "scipy", "vis", "matplotlib"],
     long_description=long_description,
     license = 'GPLv3'
 )

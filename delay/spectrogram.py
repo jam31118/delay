@@ -3,8 +3,13 @@
 from os.path import isfile
 
 import numpy as np
+from scipy.signal import find_peaks
+from vis.plot import construct_catesian_mesh_for_pcolormesh
+from matplotlib.axes import Axes
 
-from .default import default_config, get_delay_value_array
+from .default import default_config, get_delay_value_array, get_find_peaks_kwargs
+from .fzero import find_all_zeros
+
 
 class Spectrogram(object):
 
@@ -69,5 +74,67 @@ class Spectrogram(object):
         if num_of_omega is None: num_of_omega = default_config["num_of_omega"]
         if delay_value_array is None: delay_value_array = get_delay_value_array()
         return cls(raw_file_path, num_of_delays, num_of_omega, delay_value_array)
+
+    def find_peak_from_single_spectrum(self, delay_index, num_of_explicit_peaks, num_of_poly=10, find_peaks_kwargs=None):
+        data_array_3d = self.data
+
+        omega_array = data_array_3d[delay_index,:,0]
+        partial_spectrum_1 = data_array_3d[delay_index,:,1]
+        partial_spectrum_2 = data_array_3d[delay_index,:,2]
+        total_spectrum = data_array_3d[delay_index,:,3]
+        
+        if find_peaks_kwargs is None:
+            find_peaks_kwargs = get_find_peaks_kwargs()
+        peaks_indice, _ = find_peaks(total_spectrum, **find_peaks_kwargs)
+
+        omega_at_peaks = self.omega_array[peaks_indice]
+        #estimated_peak_interval = peaks_indice[-1] - peaks_indice[-2]
+        assert len(omega_at_peaks) >= 2
+        estimated_omega_interval = omega_at_peaks[-1] - omega_at_peaks[-2]
+        
+        omega_range_min = omega_at_peaks[0] - estimated_omega_interval // 3
+        omega_range_max = omega_at_peaks[-1] + estimated_omega_interval // 3
+        
+        sliced_omega_array_mask = (self.omega_array < omega_range_max) & (self.omega_array > omega_range_min)
+        sliced_omega_array = self.omega_array[sliced_omega_array_mask]
+        sliced_total_spec = total_spectrum[sliced_omega_array_mask]
+
+        num_of_omega_in_slice = len(sliced_omega_array)
+
+        polyfit_results = np.polyfit(sliced_omega_array, sliced_total_spec, num_of_poly)
+        fitted_poly = np.poly1d(polyfit_results)
+
+        omega_at_peaks_by_fitting = find_all_zeros(fitted_poly.deriv(m=1), sliced_omega_array, target='maximum')
+        num_of_found_peaks_from_fitting = omega_at_peaks_by_fitting.size
+
+        omega_at_peaks_to_return = np.empty(num_of_explicit_peaks, dtype=float)
+        if num_of_found_peaks_from_fitting == num_of_explicit_peaks:
+            omega_at_peaks_to_return[:] = omega_at_peaks_by_fitting
+        elif num_of_found_peaks_from_fitting < num_of_explicit_peaks:
+            omega_at_peaks_to_return[-num_of_found_peaks_from_fitting:] = omega_at_peaks_by_fitting
+            num_of_nan_in_result = num_of_explicit_peaks - num_of_found_peaks_from_fitting
+            omega_at_peaks_to_return[:num_of_nan_in_result] = np.nan
+        elif num_of_found_peaks_from_fitting > num_of_explicit_peaks:
+#            raise ValueError("The `num_of_explicit_peaks` is too small: {}".format(num_of_explicit_peaks))
+            omega_at_peaks_to_return[:] = omega_at_peaks_by_fitting[-num_of_explicit_peaks:]
+        else: raise Exception("Unexpected Exception")
+
+        return omega_at_peaks_to_return
+
+    def find_peaks_for_all_delay(self, num_of_explicit_peaks):
+        out_array_shape = (self.num_of_delays, num_of_explicit_peaks+1)
+        out_array = np.empty(out_array_shape, dtype=float)
+        out_array[:,0] = self.delay_value_array
+        for delay_index in range(self.num_of_delays):
+            out_array[delay_index,1:] = self.find_peak_from_single_spectrum(delay_index, num_of_explicit_peaks)
+        return out_array
+
+    def draw_spectrogram_on_axes(self, ax, **pcolormesh_kwargs):
+        assert isinstance(ax, Axes)
+        X, Y = construct_catesian_mesh_for_pcolormesh(self.delay_value_array, self.omega_array)
+        total_spectrum_column_index_in_data = 3
+        data_array_2d = self.data[:,:,total_spectrum_column_index_in_data]
+        pcm = ax.pcolormesh(X, Y, data_array_2d, **pcolormesh_kwargs)
+        return pcm
 
 

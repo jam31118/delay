@@ -87,12 +87,16 @@ class Spectrogram(object):
             find_peaks_kwargs = get_find_peaks_kwargs()
         peaks_indice, _ = find_peaks(total_spectrum, **find_peaks_kwargs)
 
+        if len(peaks_indice) > num_of_explicit_peaks: peaks_indice = peaks_indice[-num_of_explicit_peaks:]
+
         omega_at_peaks = self.omega_array[peaks_indice]
         #estimated_peak_interval = peaks_indice[-1] - peaks_indice[-2]
         assert len(omega_at_peaks) >= 2
         estimated_omega_interval = omega_at_peaks[-1] - omega_at_peaks[-2]
-        
-        omega_range_min = omega_at_peaks[0] - estimated_omega_interval // 3
+       
+
+#        omega_range_min = omega_at_peaks[0] - estimated_omega_interval // 3
+        omega_range_min = omega_at_peaks[-1] - (num_of_explicit_peaks - 1) * estimated_omega_interval - estimated_omega_interval // 3
         omega_range_max = omega_at_peaks[-1] + estimated_omega_interval // 3
         
         sliced_omega_array_mask = (self.omega_array < omega_range_max) & (self.omega_array > omega_range_min)
@@ -121,12 +125,12 @@ class Spectrogram(object):
 
         return omega_at_peaks_to_return
 
-    def find_peaks_for_all_delay(self, num_of_explicit_peaks):
+    def find_peaks_for_all_delay(self, num_of_explicit_peaks, **single_peak_find_kwargs):
         out_array_shape = (self.num_of_delays, num_of_explicit_peaks+1)
         out_array = np.empty(out_array_shape, dtype=float)
         out_array[:,0] = self.delay_value_array
         for delay_index in range(self.num_of_delays):
-            out_array[delay_index,1:] = self.find_peak_from_single_spectrum(delay_index, num_of_explicit_peaks)
+            out_array[delay_index,1:] = self.find_peak_from_single_spectrum(delay_index, num_of_explicit_peaks, **single_peak_find_kwargs)
         return out_array
 
     def draw_spectrogram_on_axes(self, ax, **pcolormesh_kwargs):

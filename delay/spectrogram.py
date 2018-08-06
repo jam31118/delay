@@ -133,12 +133,24 @@ class Spectrogram(object):
             out_array[delay_index,1:] = self.find_peak_from_single_spectrum(delay_index, num_of_explicit_peaks, **single_peak_find_kwargs)
         return out_array
 
-    def draw_spectrogram_on_axes(self, ax, **pcolormesh_kwargs):
-        assert isinstance(ax, Axes)
-        X, Y = construct_catesian_mesh_for_pcolormesh(self.delay_value_array, self.omega_array)
+    def get_2D_total_spectrum_data(self):
         total_spectrum_column_index_in_data = 3
         data_array_2d = self.data[:,:,total_spectrum_column_index_in_data]
+        return data_array_2d
+
+    def draw_spectrogram_on_axes_with_pcolormesh(self, ax, **pcolormesh_kwargs):
+        assert isinstance(ax, Axes)
+        X, Y = construct_catesian_mesh_for_pcolormesh(self.delay_value_array, self.omega_array)
+        data_array_2d = self.get_2D_total_spectrum_data()
         pcm = ax.pcolormesh(X, Y, data_array_2d, **pcolormesh_kwargs)
         return pcm
 
+    def draw_spectrogram_on_axes(self, ax, **pcolormesh_kwargs):
+        return self.draw_spectrogram_on_axes_with_pcolormesh()
+    
+    def draw_spectrogram_on_axes_with_contourf(self, ax, *contour_args, **contourf_kwargs):
+        X, Y = np.meshgrid(self.delay_value_array, self.omega_array, indexing='ij')
+        data_array_2d = self.get_2D_total_spectrum_data()
+        contours = ax.contourf(X, Y, data_array_2d, *contour_args, **contourf_kwargs)
+        return contours
 

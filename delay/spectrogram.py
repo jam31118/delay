@@ -1,6 +1,7 @@
 """Spectrogram Object"""
 
 from os.path import isfile
+from numbers import Real
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -138,9 +139,11 @@ class Spectrogram(object):
         data_array_2d = self.data[:,:,total_spectrum_column_index_in_data]
         return data_array_2d
 
-    def draw_spectrogram_on_axes_with_pcolormesh(self, ax, **pcolormesh_kwargs):
+    def draw_spectrogram_on_axes_with_pcolormesh(self, ax, x_scale=1.0, y_scale=1.0, **pcolormesh_kwargs):
         assert isinstance(ax, Axes)
         X, Y = construct_catesian_mesh_for_pcolormesh(self.delay_value_array, self.omega_array)
+        X *= x_scale
+        Y *= y_scale
         data_array_2d = self.get_2D_total_spectrum_data()
         pcm = ax.pcolormesh(X, Y, data_array_2d, **pcolormesh_kwargs)
         return pcm
@@ -148,8 +151,12 @@ class Spectrogram(object):
     def draw_spectrogram_on_axes(self, ax, **pcolormesh_kwargs):
         return self.draw_spectrogram_on_axes_with_pcolormesh()
     
-    def draw_spectrogram_on_axes_with_contourf(self, ax, *contour_args, **contourf_kwargs):
+    def draw_spectrogram_on_axes_with_contourf(self, ax, x_scale=1.0, y_scale=1.0, contour_args=(), **contourf_kwargs):
+        assert isinstance(ax, Axes)
         X, Y = np.meshgrid(self.delay_value_array, self.omega_array, indexing='ij')
+        assert isinstance(x_scale, Real) and isinstance(y_scale, Real)
+        X *= x_scale
+        Y *= y_scale
         data_array_2d = self.get_2D_total_spectrum_data()
         contours = ax.contourf(X, Y, data_array_2d, *contour_args, **contourf_kwargs)
         return contours
